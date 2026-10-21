@@ -211,6 +211,15 @@ def main(page: ft.Page):
         ft.Divider(opacity=0.2),
         footer,
     )
-
-if __name__ == "__main__":
-    ft.app(target=main)
+  if __name__ == "__main__":
+    try:
+        import flet
+        if hasattr(flet, "app"):
+            flet.app(target=main)
+        else:
+            from flet.flet import app
+            app(target=main)
+    except Exception:
+        import flet as ft
+        ft.app(main)
+ 
