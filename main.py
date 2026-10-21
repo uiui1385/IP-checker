@@ -1,4 +1,5 @@
 import flet as ft
+from flet import app
 import requests
 from urllib.parse import urlparse
 
