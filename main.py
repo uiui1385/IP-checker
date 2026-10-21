@@ -1,225 +1,178 @@
 import flet as ft
-from flet import app
 import requests
-from urllib.parse import urlparse
 
-def clean_domain(raw_input: str) -> str:
-    raw_input = raw_input.strip()
-    if raw_input.startswith("http://") or raw_input.startswith("https://"):
-        raw_input = urlparse(raw_input).netloc
-    # حذف پورت یا اسلش‌های اضافی
-    raw_input = raw_input.split('/')[0].split(':')[0].strip()
-    return raw_input
-
-def resolve_dns(domain: str):
-    """استعلام رکوردهای A و AAAA از طریق Cloudflare DNS over HTTPS"""
-    results = {"A": [], "AAAA": []}
-    headers = {"accept": "application/dns-json"}
-    
-    for record_type in ["A", "AAAA"]:
-        try:
-            url = f"https://cloudflare-dns.com/dns-query?name={domain}&type={record_type}"
-            res = requests.get(url, headers=headers, timeout=6)
-            if res.status_code == 200:
-                data = res.json()
-                for ans in data.get("Answer", []):
-                    # نوع 1 = A و نوع 28 = AAAA
-                    if ans.get("type") in [1, 28]:
-                        results[record_type].append(ans.get("data"))
-        except Exception:
-            pass
-            
-    results["A"] = sorted(list(set(results["A"])))
-    results["AAAA"] = sorted(list(set(results["AAAA"])))
-    return results
 
 def main(page: ft.Page):
-    page.title = "DNS & IP Resolver Pro"
+    page.title = "IP Resolver - @tariknet_pv"
     page.theme_mode = ft.ThemeMode.DARK
-    page.vertical_alignment = ft.MainAxisAlignment.START
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.padding = 20
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.scroll = ft.ScrollMode.ADAPTIVE
 
-    # اسنک‌بار برای اعلان کپی شدن
-    def show_toast(text: str):
-        page.snack_bar = ft.SnackBar(ft.Text(text, color=ft.Colors.WHITE), bgcolor=ft.Colors.GREEN_700)
-        page.snack_bar.open = True
-        page.update()
-
-    # دیالوگ سازنده (About)
-    def open_about(e):
-        about_dialog = ft.AlertDialog(
-            title=ft.Text("درباره توسعه‌دهنده", weight=ft.FontWeight.BOLD),
-            content=ft.Column(
-                [
-                    ft.Text("ابزار استعلام پیشرفته IP و DNS سایت‌ها"),
-                    ft.Text("توسعه یافته توسط:"),
-                    ft.TextButton(
-                        text="@tariknet_pv",
-                        icon=ft.Icons.TELEGRAM,
-                        url="https://t.me/tariknet_pv"
-                    ),
-                ],
-                tight=True,
-                spacing=10
-            ),
-            actions=[
-                ft.TextButton("بستن", on_click=lambda _: page.close(about_dialog))
-            ]
-        )
-        page.open(about_dialog)
-
-    # هدر بالای برنامه
-    header = ft.Row(
-        [
-            ft.Row(
-                [
-                    ft.Icon(ft.Icons.SECURITY, color=ft.Colors.CYAN_ACCENT, size=28),
-                    ft.Text("IP Resolver Pro", size=22, weight=ft.FontWeight.BOLD),
-                ],
-                alignment=ft.MainAxisAlignment.START,
-            ),
-            ft.IconButton(
-                icon=ft.Icons.INFO_OUTLINE,
-                tooltip="درباره ما",
-                on_click=open_about,
-            ),
-        ],
-        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+    header_icon = ft.Icon(
+        ft.icons.PODCAST_ROUNDED,
+        size=50,
+        color=ft.colors.CYAN_ACCENT,
     )
 
-    # فیلد ورودی دامنه
-    txt_domain = ft.TextField(
+    header_title = ft.Text(
+        "IP Finder Pro",
+        size=24,
+        weight=ft.FontWeight.BOLD,
+        color=ft.colors.WHITE,
+    )
+
+    badge = ft.Container(
+        content=ft.Text(
+            "Created by @tariknet_pv",
+            size=12,
+            weight=ft.FontWeight.W_600,
+            color=ft.colors.CYAN_200,
+        ),
+        bgcolor=ft.colors.CYAN_900,
+        padding=ft.padding.symmetric(horizontal=12, vertical=4),
+        border_radius=20,
+    )
+
+    domain_input = ft.TextField(
         label="آدرس دامنه یا سایت",
-        hint_text="example.com",
-        prefix_icon=ft.Icons.LANGUAGE,
+        hint_text="مثال: google.com",
+        prefix_icon=ft.icons.LANGUAGE,
         border_radius=12,
-        expand=True,
+        border_color=ft.colors.CYAN_400,
+        focused_border_color=ft.colors.CYAN_ACCENT,
+        text_align=ft.TextAlign.LEFT,
+        autofocus=True,
     )
 
-    # لیست نتایج
-    result_list = ft.ListView(expand=True, spacing=10, padding=5)
-    progress_bar = ft.ProgressBar(visible=False, color=ft.Colors.CYAN_ACCENT)
+    loading = ft.ProgressRing(visible=False, color=ft.colors.CYAN_ACCENT)
 
-    def create_ip_card(ip: str, ip_type: str):
-        def copy_click(e):
-            page.set_clipboard(ip)
-            show_toast(f"آی‌پی {ip} با موفقیت کپی شد!")
+    result_text = ft.Text(
+        "",
+        size=14,
+        selectable=True,
+        color=ft.colors.WHITE,
+    )
 
-        return ft.Card(
-            elevation=4,
-            content=ft.Container(
-                padding=12,
-                content=ft.Row(
-                    [
-                        ft.Column(
-                            [
-                                ft.Text(ip, size=15, weight=ft.FontWeight.BOLD, selectable=True),
-                                ft.Text(f"نوع رکورد: {ip_type}", size=11, color=ft.Colors.GREY_400),
-                            ],
-                            alignment=ft.MainAxisAlignment.CENTER,
-                            horizontal_alignment=ft.CrossAxisAlignment.START,
-                        ),
-                        ft.IconButton(
-                            icon=ft.Icons.COPY_ROUNDED,
-                            tooltip="کپی آی‌پی",
-                            on_click=copy_click,
-                        ),
-                    ],
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                ),
-            ),
-        )
+    result_card = ft.Card(
+        content=ft.Container(
+            content=result_text,
+            padding=16,
+            width=360,
+        ),
+        visible=False,
+        color=ft.colors.SURFACE_VARIANT,
+    )
 
-    def on_search(e):
-        raw_val = txt_domain.value
-        domain = clean_domain(raw_val)
-        if not domain:
-            show_toast("لطفاً آدرس یک دامنه را بنویسید!")
+    def clean_domain(raw_url: str) -> str:
+        url = raw_url.strip().lower()
+        if "://" in url:
+            url = url.split("://", 1)[1]
+        url = url.split("/")[0]
+        url = url.split(":")[0]
+        return url
+
+    def fetch_ip(e):
+        target = clean_domain(domain_input.value)
+        if not target:
+            result_text.value = "⚠️ لطفاً یک نام دامنه یا آدرس وارد کنید."
+            result_card.visible = True
+            page.update()
             return
 
-        progress_bar.visible = True
-        btn_search.disabled = True
-        result_list.controls.clear()
+        loading.visible = True
+        result_card.visible = False
         page.update()
 
+        found_ips = []
+
+        # 1. کوئری IPv4 (A Record)
         try:
-            data = resolve_dns(domain)
-            v4_list = data["A"]
-            v6_list = data["AAAA"]
+            url_a = f"https://cloudflare-dns.com/dns-query?name={target}&type=A"
+            res_a = requests.get(url_a, headers={"accept": "application/dns-json"}, timeout=8).json()
+            if "Answer" in res_a:
+                for record in res_a["Answer"]:
+                    if record.get("type") == 1:
+                        found_ips.append(("IPv4", record.get("data")))
+        except Exception:
+            pass
 
-            if not v4_list and not v6_list:
-                result_list.controls.append(
-                    ft.Text("هیچ آی‌پی یا رکوردی برای این آدرس پیدا نشد.", color=ft.Colors.RED_ACCENT)
-                )
-            else:
-                if v4_list:
-                    result_list.controls.append(
-                        ft.Text(f"آدرس‌های IPv4 ({len(v4_list)} مورد):", size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_200)
-                    )
-                    for ip in v4_list:
-                        result_list.controls.append(create_ip_card(ip, "IPv4 (A)"))
+        # 2. کوئری IPv6 (AAAA Record)
+        try:
+            url_aaaa = f"https://cloudflare-dns.com/dns-query?name={target}&type=AAAA"
+            res_aaaa = requests.get(url_aaaa, headers={"accept": "application/dns-json"}, timeout=8).json()
+            if "Answer" in res_aaaa:
+                for record in res_aaaa["Answer"]:
+                    if record.get("type") == 28:
+                        found_ips.append(("IPv6", record.get("data")))
+        except Exception:
+            pass
 
-                if v6_list:
-                    result_list.controls.append(
-                        ft.Text(f"آدرس‌های IPv6 ({len(v6_list)} مورد):", size=13, weight=ft.FontWeight.BOLD, color=ft.Colors.CYAN_200)
-                    )
-                    for ip in v6_list:
-                        result_list.controls.append(create_ip_card(ip, "IPv6 (AAAA)"))
+        # آماده‌سازی خروجی
+        if found_ips:
+            output = f"🌐 نتایج برای دامنه: {target}\n"
+            output += "═" * 30 + "\n\n"
+            for ip_type, ip_val in found_ips:
+                output += f"📍 [{ip_type}]:  {ip_val}\n"
+            output += "\n━━━━━━━━━━━━━━━━━━\n"
+            output += "Powered by: @tariknet_pv"
+            result_text.value = output
+        else:
+            result_text.value = f"❌ هیچ آی‌پی برای '{target}' پیدا نشد یا اینترنت قطع است."
 
-        except Exception as err:
-            result_list.controls.append(ft.Text(f"خطا در دریافت اطلاعات: {err}", color=ft.Colors.RED_400))
-
-        progress_bar.visible = False
-        btn_search.disabled = False
+        loading.visible = False
+        result_card.visible = True
         page.update()
 
     btn_search = ft.ElevatedButton(
-        "استعلام IP",
-        icon=ft.Icons.SEARCH,
-        style=ft.ButtonStyle(
-            bgcolor=ft.Colors.CYAN_700,
-            color=ft.Colors.WHITE,
-            shape=ft.RoundedRectangleBorder(radius=10),
-        ),
-        height=50,
-        on_click=on_search,
-    )
-
-    # فوتر ثابت شامل آیدی تلگرام
-    footer = ft.Container(
-        padding=10,
         content=ft.Row(
             [
-                ft.Text("Dev Support:", size=12, color=ft.Colors.GREY_400),
-                ft.TextButton(
-                    text="@tariknet_pv",
-                    url="https://t.me/tariknet_pv",
-                    style=ft.ButtonStyle(color=ft.Colors.CYAN_ACCENT),
-                ),
+                ft.Icon(ft.icons.SEARCH, color=ft.colors.BLACK),
+                ft.Text("دریافت آی‌پی", size=15, weight=ft.FontWeight.BOLD, color=ft.colors.BLACK),
             ],
             alignment=ft.MainAxisAlignment.CENTER,
+            tight=True,
         ),
+        style=ft.ButtonStyle(
+            bgcolor=ft.colors.CYAN_ACCENT,
+            shape=ft.RoundedRectangleBorder(radius=10),
+            padding=ft.padding.symmetric(vertical=15, horizontal=25),
+        ),
+        on_click=fetch_ip,
+        width=220,
+    )
+
+    footer = ft.Container(
+        content=ft.Column(
+            [
+                ft.Divider(color=ft.colors.WHITE24),
+                ft.Text(
+                    "پشتیبانی و ارتباط تلگرام: tariknet_pv@",
+                    size=12,
+                    color=ft.colors.GREY_400,
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        ),
+        margin=ft.margin.only(top=30),
     )
 
     page.add(
-        header,
-        ft.Divider(opacity=0.3),
-        ft.Row([txt_domain, btn_search]),
-        progress_bar,
-        ft.Container(content=result_list, expand=True),
-        ft.Divider(opacity=0.2),
+        ft.Container(height=10),
+        header_icon,
+        header_title,
+        badge,
+        ft.Container(height=20),
+        domain_input,
+        ft.Container(height=15),
+        btn_search,
+        ft.Container(height=15),
+        loading,
+        result_card,
         footer,
     )
-  if __name__ == "__main__":
-    try:
-        import flet
-        if hasattr(flet, "app"):
-            flet.app(target=main)
-        else:
-            from flet.flet import app
-            app(target=main)
-    except Exception:
-        import flet as ft
-        ft.app(main)
- 
+
+
+if __name__ == "__main__":
+    ft.app(main)
