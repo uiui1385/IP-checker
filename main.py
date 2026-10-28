@@ -172,7 +172,10 @@ def main(page: ft.Page):
         result_card,
         footer,
     )
-
-
+    
 if __name__ == "__main__":
-    ft.app(main)
+    try:
+        from flet_runtime.app import app
+        app(main)
+    except ImportError:
+        ft.app(main)
