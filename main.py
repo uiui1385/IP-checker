@@ -1,9 +1,7 @@
-import asyncio
 import flet as ft
 import requests
 
-
-async def main(page: ft.Page):
+def main(page: ft.Page):
     page.title = "IP Resolver - @tariknet_pv"
     page.theme_mode = ft.ThemeMode.DARK
     page.bgcolor = "#121212"
@@ -12,8 +10,8 @@ async def main(page: ft.Page):
     page.scroll = ft.ScrollMode.ADAPTIVE
 
     header_icon = ft.Icon(
-        ft.Icons.PODCAST_ROUNDED,
-        size=48,
+        ft.icons.PODCAST_ROUNDED,
+        size=45,
         color="#00E5FF",
     )
 
@@ -37,9 +35,9 @@ async def main(page: ft.Page):
     )
 
     domain_input = ft.TextField(
-        label="آدرس دامنه یا سایت",
+        label="آدرس سایت یا دامنه",
         hint_text="مثال: google.com",
-        prefix_icon=ft.Icons.LANGUAGE,
+        prefix_icon=ft.icons.LANGUAGE,
         border_radius=12,
         border_color="#00E5FF",
         text_align=ft.TextAlign.LEFT,
@@ -65,54 +63,49 @@ async def main(page: ft.Page):
     )
 
     def clean_domain(raw_url: str) -> str:
-        url = raw_url.strip().lower()
+        url = (raw_url or "").strip().lower()
         if "://" in url:
             url = url.split("://", 1)[1]
         url = url.split("/")[0]
         url = url.split(":")[0]
         return url
 
-    async def fetch_ip(e):
-        target = clean_domain(domain_input.value or "")
+    def fetch_ip(e):
+        target = clean_domain(domain_input.value)
         if not target:
-            result_text.value = "⚠️ لطفاً یک نام دامنه یا آدرس وارد کنید."
+            result_text.value = "⚠️ لطفاً یک نام دامنه وارد کنید."
             result_card.visible = True
-            await page.update_async()
+            page.update()
             return
 
         loading.visible = True
         result_card.visible = False
-        await page.update_async()
+        page.update()
 
-        loop = asyncio.get_running_loop()
+        found_ips = []
 
-        def query_dns():
-            ips = []
-            try:
-                url_a = f"https://cloudflare-dns.com/dns-query?name={target}&type=A"
-                res_a = requests.get(url_a, headers={"accept": "application/dns-json"}, timeout=8).json()
-                if "Answer" in res_a:
-                    for record in res_a["Answer"]:
-                        if record.get("type") == 1:
-                            ips.append(("IPv4", record.get("data")))
-            except Exception:
-                pass
+        try:
+            url_a = f"https://cloudflare-dns.com/dns-query?name={target}&type=A"
+            res_a = requests.get(url_a, headers={"accept": "application/dns-json"}, timeout=8).json()
+            if "Answer" in res_a:
+                for record in res_a["Answer"]:
+                    if record.get("type") == 1:
+                        found_ips.append(("IPv4", record.get("data")))
+        except Exception:
+            pass
 
-            try:
-                url_aaaa = f"https://cloudflare-dns.com/dns-query?name={target}&type=AAAA"
-                res_aaaa = requests.get(url_aaaa, headers={"accept": "application/dns-json"}, timeout=8).json()
-                if "Answer" in res_aaaa:
-                    for record in res_aaaa["Answer"]:
-                        if record.get("type") == 28:
-                            ips.append(("IPv6", record.get("data")))
-            except Exception:
-                pass
-            return ips
-
-        found_ips = await loop.run_in_executor(None, query_dns)
+        try:
+            url_aaaa = f"https://cloudflare-dns.com/dns-query?name={target}&type=AAAA"
+            res_aaaa = requests.get(url_aaaa, headers={"accept": "application/dns-json"}, timeout=8).json()
+            if "Answer" in res_aaaa:
+                for record in res_aaaa["Answer"]:
+                    if record.get("type") == 28:
+                        found_ips.append(("IPv6", record.get("data")))
+        except Exception:
+            pass
 
         if found_ips:
-            output = f"🌐 نتایج برای دامنه: {target}\n"
+            output = f"🌐 نتایج دامنه: {target}\n"
             output += "═" * 28 + "\n\n"
             for ip_type, ip_val in found_ips:
                 output += f"📍 [{ip_type}]: {ip_val}\n"
@@ -120,16 +113,16 @@ async def main(page: ft.Page):
             output += "Powered by: @tariknet_pv"
             result_text.value = output
         else:
-            result_text.value = f"❌ هیچ آی‌پی برای '{target}' پیدا نشد یا اینترنت قطع است."
+            result_text.value = f"❌ هیچ آی‌پی برای '{target}' پیدا نشد."
 
         loading.visible = False
         result_card.visible = True
-        await page.update_async()
+        page.update()
 
     btn_search = ft.ElevatedButton(
         content=ft.Row(
             [
-                ft.Icon(ft.Icons.SEARCH, color="#000000"),
+                ft.Icon(ft.icons.SEARCH, color="#000000"),
                 ft.Text("دریافت آی‌پی", size=15, weight=ft.FontWeight.BOLD, color="#000000"),
             ],
             alignment=ft.MainAxisAlignment.CENTER,
@@ -160,7 +153,7 @@ async def main(page: ft.Page):
         margin=ft.margin.only(top=30),
     )
 
-    await page.add_async(
+    page.add(
         ft.Container(height=10),
         header_icon,
         header_title,
@@ -176,9 +169,5 @@ async def main(page: ft.Page):
     )
 
 
-if __name__ == "__main__":
-    try:
-        from flet_runtime.app import app_async
-        asyncio.run(app_async(main))
-    except Exception:
-        ft.app(main)
+# اجرای مستقیم و بدون شرط if __name__ تا در محیط موبایل هم قطعی فراخوانی شود
+ft.app(target=main)
