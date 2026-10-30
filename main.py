@@ -4,170 +4,163 @@ import requests
 def main(page: ft.Page):
     page.title = "IP Resolver - @tariknet_pv"
     page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#121212"
-    page.padding = 20
-    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
     page.scroll = ft.ScrollMode.ADAPTIVE
+    page.horizontal_alignment = ft.CrossAxisAlignment.CENTER
+    page.padding = 20
 
-    header_icon = ft.Icon(
-        ft.icons.PODCAST_ROUNDED,
-        size=45,
-        color="#00E5FF",
+    header = ft.Column(
+        controls=[
+            ft.Text(
+                "🌐 Website IP Resolver",
+                size=26,
+                weight=ft.FontWeight.BOLD,
+                color=ft.colors.CYAN_ACCENT,
+                text_align=ft.TextAlign.CENTER,
+            ),
+            ft.Text(
+                "Developed by: @tariknet_pv",
+                size=14,
+                weight=ft.FontWeight.W_500,
+                color=ft.colors.LIGHT_BLUE_200,
+                text_align=ft.TextAlign.CENTER,
+            ),
+        ],
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
     )
 
-    header_title = ft.Text(
-        "IP Finder Pro",
-        size=22,
-        weight=ft.FontWeight.BOLD,
-        color="#FFFFFF",
-    )
-
-    badge = ft.Container(
-        content=ft.Text(
-            "Created by @tariknet_pv",
-            size=12,
-            weight=ft.FontWeight.W_600,
-            color="#80DEEA",
-        ),
-        bgcolor="#004D40",
-        padding=ft.padding.symmetric(horizontal=12, vertical=5),
-        border_radius=20,
-    )
-
-    domain_input = ft.TextField(
-        label="آدرس سایت یا دامنه",
-        hint_text="مثال: google.com",
-        prefix_icon=ft.icons.LANGUAGE,
+    url_input = ft.TextField(
+        label="دامنه یا آدرس سایت (مثلاً google.com)",
+        hint_text="example.com",
+        prefix_icon=ft.icons.LINK,
         border_radius=12,
-        border_color="#00E5FF",
-        text_align=ft.TextAlign.LEFT,
+        autofocus=True,
     )
 
-    loading = ft.ProgressRing(visible=False, color="#00E5FF")
+    status_text = ft.Text(value="", size=14, text_align=ft.TextAlign.CENTER)
 
-    result_text = ft.Text(
-        "",
-        size=14,
-        selectable=True,
-        color="#FFFFFF",
-    )
+    result_column = ft.Column(spacing=10, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
-    result_card = ft.Card(
-        content=ft.Container(
-            content=result_text,
-            padding=16,
-            width=350,
-        ),
-        visible=False,
-        color="#1E1E1E",
-    )
+    def resolve_domain(domain: str, record_type: str):
+        try:
+            url = f"https://cloudflare-dns.com/dns-query?name={domain}&type={record_type}"
+            headers = {"accept": "application/dns-json"}
+            res = requests.get(url, headers=headers, timeout=6)
+            if res.status_code == 200:
+                data = res.json()
+                if "Answer" in data:
+                    return [item["data"] for item in data["Answer"] if item.get("data")]
+        except Exception:
+            pass
+        return []
 
-    def clean_domain(raw_url: str) -> str:
-        url = (raw_url or "").strip().lower()
-        if "://" in url:
-            url = url.split("://", 1)[1]
-        url = url.split("/")[0]
-        url = url.split(":")[0]
-        return url
+    def copy_to_clipboard(e):
+        page.set_clipboard(e.control.data)
+        page.snack_bar = ft.SnackBar(ft.Text("آدرس IP کپی شد! ✅"), duration=1500)
+        page.snack_bar.open = True
+        page.update()
 
-    def fetch_ip(e):
-        target = clean_domain(domain_input.value)
-        if not target:
-            result_text.value = "⚠️ لطفاً یک نام دامنه وارد کنید."
-            result_card.visible = True
+    def on_check_clicked(e):
+        raw_val = (url_input.value or "").strip().lower()
+        if not raw_val:
+            status_text.value = "لطفاً ابتدا نام یک دامنه را وارد کنید."
+            status_text.color = ft.colors.RED_ACCENT
+            result_column.controls.clear()
             page.update()
             return
 
-        loading.visible = True
-        result_card.visible = False
+        domain = raw_val.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0]
+
+        status_text.value = "در حال دریافت اطلاعات DNS..."
+        status_text.color = ft.colors.AMBER_ACCENT
+        result_column.controls.clear()
         page.update()
 
-        found_ips = []
+        ipv4_list = resolve_domain(domain, "A")
+        ipv6_list = resolve_domain(domain, "AAAA")
 
-        try:
-            url_a = f"https://cloudflare-dns.com/dns-query?name={target}&type=A"
-            res_a = requests.get(url_a, headers={"accept": "application/dns-json"}, timeout=8).json()
-            if "Answer" in res_a:
-                for record in res_a["Answer"]:
-                    if record.get("type") == 1:
-                        found_ips.append(("IPv4", record.get("data")))
-        except Exception:
-            pass
+        result_column.controls.clear()
 
-        try:
-            url_aaaa = f"https://cloudflare-dns.com/dns-query?name={target}&type=AAAA"
-            res_aaaa = requests.get(url_aaaa, headers={"accept": "application/dns-json"}, timeout=8).json()
-            if "Answer" in res_aaaa:
-                for record in res_aaaa["Answer"]:
-                    if record.get("type") == 28:
-                        found_ips.append(("IPv6", record.get("data")))
-        except Exception:
-            pass
+        if not ipv4_list and not ipv6_list:
+            status_text.value = "هیچ رکوردی برای این دامنه پیدا نشد یا ارتباط با DNS برقرار نشد."
+            status_text.color = ft.colors.RED_ACCENT
+            page.update()
+            return
 
-        if found_ips:
-            output = f"🌐 نتایج دامنه: {target}\n"
-            output += "═" * 28 + "\n\n"
-            for ip_type, ip_val in found_ips:
-                output += f"📍 [{ip_type}]: {ip_val}\n"
-            output += "\n━━━━━━━━━━━━━━━━━━\n"
-            output += "Powered by: @tariknet_pv"
-            result_text.value = output
-        else:
-            result_text.value = f"❌ هیچ آی‌پی برای '{target}' پیدا نشد."
+        status_text.value = f"نتایج مربوط به {domain}:"
+        status_text.color = ft.colors.GREEN_ACCENT
 
-        loading.visible = False
-        result_card.visible = True
+        for ip in ipv4_list:
+            result_column.controls.append(
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.icons.DNS, color=ft.colors.CYAN_300),
+                            ft.Text(f"IPv4: {ip}", size=15, weight=ft.FontWeight.BOLD, expand=True),
+                            ft.IconButton(
+                                icon=ft.icons.COPY,
+                                tooltip="کپی",
+                                data=ip,
+                                on_click=copy_to_clipboard,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    padding=10,
+                    border_radius=10,
+                )
+            )
+
+        for ip in ipv6_list:
+            result_column.controls.append(
+                ft.Container(
+                    content=ft.Row(
+                        controls=[
+                            ft.Icon(ft.icons.DNS, color=ft.colors.PURPLE_200),
+                            ft.Text(f"IPv6: {ip}", size=13, weight=ft.FontWeight.BOLD, expand=True),
+                            ft.IconButton(
+                                icon=ft.icons.COPY,
+                                tooltip="کپی",
+                                data=ip,
+                                on_click=copy_to_clipboard,
+                            ),
+                        ],
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    ),
+                    bgcolor=ft.colors.SURFACE_VARIANT,
+                    padding=10,
+                    border_radius=10,
+                )
+            )
+
         page.update()
 
-    btn_search = ft.ElevatedButton(
-        content=ft.Row(
-            [
-                ft.Icon(ft.icons.SEARCH, color="#000000"),
-                ft.Text("دریافت آی‌پی", size=15, weight=ft.FontWeight.BOLD, color="#000000"),
-            ],
-            alignment=ft.MainAxisAlignment.CENTER,
-            tight=True,
-        ),
+    check_btn = ft.ElevatedButton(
+        text="دریافت آی‌پی (Resolve IP)",
+        icon=ft.icons.SEARCH,
         style=ft.ButtonStyle(
-            bgcolor="#00E5FF",
-            shape=ft.RoundedRectangleBorder(radius=10),
-            padding=ft.padding.symmetric(vertical=14, horizontal=25),
+            color=ft.colors.BLACK,
+            bgcolor=ft.colors.CYAN_ACCENT,
+            padding=15,
         ),
-        on_click=fetch_ip,
-        width=220,
+        on_click=on_check_clicked,
     )
 
     footer = ft.Container(
-        content=ft.Column(
-            [
-                ft.Divider(color="#424242"),
-                ft.Text(
-                    "پشتیبانی و ارتباط تلگرام: tariknet_pv@",
-                    size=12,
-                    color="#9E9E9E",
-                    text_align=ft.TextAlign.CENTER,
-                ),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        content=ft.TextButton(
+            text="پشتیبانی و ارتباط: @tariknet_pv",
+            icon=ft.icons.SEND,
+            url="https://t.me/tariknet_pv",
         ),
         margin=ft.margin.only(top=30),
     )
 
     page.add(
-        ft.Container(height=10),
-        header_icon,
-        header_title,
-        badge,
-        ft.Container(height=20),
-        domain_input,
-        ft.Container(height=15),
-        btn_search,
-        ft.Container(height=15),
-        loading,
-        result_card,
+        header,
+        ft.Divider(height=20, color=ft.colors.TRANSPARENT),
+        url_input,
+        ft.Container(content=check_btn, margin=ft.margin.only(top=10, bottom=10)),
+        status_text,
+        result_column,
         footer,
     )
-
-
-# اجرای مستقیم و بدون شرط if __name__ تا در محیط موبایل هم قطعی فراخوانی شود
-ft.app(target=main)
