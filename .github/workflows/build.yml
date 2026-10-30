@@ -5,6 +5,9 @@ on:
     branches: [ "main", "master" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -31,10 +34,20 @@ jobs:
 
       - name: Build APK with Flet
         run: |
-          printf 'y\n' | flet build apk --project "IPResolver" --org "com.tariknet.ipresolver" -vv
+          printf 'y\n' | flet build apk --project "IPResolver" --org "com.tariknet.ipresolver" --permissions INTERNET -vv
 
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
+      - name: Find and Prepare APK
+        run: |
+          mkdir -p output
+          find . -name "*.apk" -type f -exec cp {} output/IPResolver.apk \;
+          ls -lh output/
+
+      - name: Release Direct APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/heads/')
         with:
-          name: IPResolver-APK
-          path: build/apk/*.apk
+          tag_name: v1.0.${{ github.run_number }}
+          name: "IPResolver Update #${{ github.run_number }}"
+          files: output/IPResolver.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
