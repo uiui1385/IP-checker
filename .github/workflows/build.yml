@@ -34,7 +34,7 @@ jobs:
 
       - name: Build APK with Flet
         run: |
-          printf 'y\n' | flet build apk --project "IPResolver" --org "com.tariknet.ipresolver" --permissions INTERNET -vv
+          printf 'y\n' | flet build apk --project "IPResolver" --org "com.tariknet.ipresolver" -vv
 
       - name: Find and Prepare APK
         run: |
