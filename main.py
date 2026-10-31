@@ -1,7 +1,7 @@
 import flet as ft
 import requests
 
-def main(page: ft.Page):
+async def main(page: ft.Page):
     page.title = "IP Resolver - @tariknet_pv"
     page.theme_mode = ft.ThemeMode.DARK
     page.scroll = ft.ScrollMode.ADAPTIVE
@@ -12,7 +12,7 @@ def main(page: ft.Page):
         controls=[
             ft.Text(
                 "🌐 Website IP Resolver",
-                size=26,
+                size=24,
                 weight=ft.FontWeight.BOLD,
                 color=ft.colors.CYAN_ACCENT,
                 text_align=ft.TextAlign.CENTER,
@@ -43,7 +43,7 @@ def main(page: ft.Page):
         try:
             url = f"https://cloudflare-dns.com/dns-query?name={domain}&type={record_type}"
             headers = {"accept": "application/dns-json"}
-            res = requests.get(url, headers=headers, timeout=6)
+            res = requests.get(url, headers=headers, timeout=5)
             if res.status_code == 200:
                 data = res.json()
                 if "Answer" in data:
@@ -52,19 +52,19 @@ def main(page: ft.Page):
             pass
         return []
 
-    def copy_to_clipboard(e):
-        page.set_clipboard(e.control.data)
+    async def copy_to_clipboard(e):
+        await page.set_clipboard_async(e.control.data)
         page.snack_bar = ft.SnackBar(ft.Text("آدرس IP کپی شد! ✅"), duration=1500)
         page.snack_bar.open = True
-        page.update()
+        await page.update_async()
 
-    def on_check_clicked(e):
+    async def on_check_clicked(e):
         raw_val = (url_input.value or "").strip().lower()
         if not raw_val:
             status_text.value = "لطفاً ابتدا نام یک دامنه را وارد کنید."
             status_text.color = ft.colors.RED_ACCENT
             result_column.controls.clear()
-            page.update()
+            await page.update_async()
             return
 
         domain = raw_val.replace("https://", "").replace("http://", "").split("/")[0].split(":")[0]
@@ -72,7 +72,7 @@ def main(page: ft.Page):
         status_text.value = "در حال دریافت اطلاعات DNS..."
         status_text.color = ft.colors.AMBER_ACCENT
         result_column.controls.clear()
-        page.update()
+        await page.update_async()
 
         ipv4_list = resolve_domain(domain, "A")
         ipv6_list = resolve_domain(domain, "AAAA")
@@ -80,9 +80,9 @@ def main(page: ft.Page):
         result_column.controls.clear()
 
         if not ipv4_list and not ipv6_list:
-            status_text.value = "هیچ رکوردی برای این دامنه پیدا نشد یا ارتباط با DNS برقرار نشد."
+            status_text.value = "هیچ رکوردی برای این دامنه پیدا نشد یا ارتباط با اینترنت برقرار نیست."
             status_text.color = ft.colors.RED_ACCENT
-            page.update()
+            await page.update_async()
             return
 
         status_text.value = f"نتایج مربوط به {domain}:"
@@ -132,7 +132,7 @@ def main(page: ft.Page):
                 )
             )
 
-        page.update()
+        await page.update_async()
 
     check_btn = ft.ElevatedButton(
         text="دریافت آی‌پی (Resolve IP)",
@@ -154,7 +154,7 @@ def main(page: ft.Page):
         margin=ft.margin.only(top=30),
     )
 
-    page.add(
+    await page.add_async(
         header,
         ft.Divider(height=20, color=ft.colors.TRANSPARENT),
         url_input,
@@ -164,9 +164,4 @@ def main(page: ft.Page):
         footer,
     )
 
-# برای حالت موبایل: اگر مستقیماً اجرا نشد و به عنوان ماژول لود شد، flet خودش main را صدا می‌زند.
-# برای تست روی سیستم شخصی هم کار کند بدون ایجاد اختلال در اندروید:
-if __name__ == "__main__":
-    if hasattr(ft, "app"):
-        ft.app(target=main)
-    
+ft.app(target=main)
