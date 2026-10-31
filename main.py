@@ -37,7 +37,6 @@ def main(page: ft.Page):
     )
 
     status_text = ft.Text(value="", size=14, text_align=ft.TextAlign.CENTER)
-
     result_column = ft.Column(spacing=10, horizontal_alignment=ft.CrossAxisAlignment.CENTER)
 
     def resolve_domain(domain: str, record_type: str):
@@ -164,3 +163,10 @@ def main(page: ft.Page):
         result_column,
         footer,
     )
+
+# برای حالت موبایل: اگر مستقیماً اجرا نشد و به عنوان ماژول لود شد، flet خودش main را صدا می‌زند.
+# برای تست روی سیستم شخصی هم کار کند بدون ایجاد اختلال در اندروید:
+if __name__ == "__main__":
+    if hasattr(ft, "app"):
+        ft.app(target=main)
+    
